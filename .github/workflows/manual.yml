@@ -24,7 +24,7 @@ jobs:
     - name: Change version number and name
       run: printf 'ext.version_code = ${{ github.event.inputs.versionCode }}\next.version_name = "${{ github.event.inputs.versionName }}"\n' > app_versions.gradle
     - name: Update Changelog
-      uses: thomaseizinger/keep-a-changelog-new-release@v1
+      uses: iloveengineering/keep-a-changelog-new-release@v1
       with:
         version: ${{ github.event.inputs.versionName }}
     - name: Commit changelog and manifest files
@@ -49,7 +49,7 @@ jobs:
         clean: true
         commit_message: release/v${{ github.event.inputs.versionName }} BOT New Strings for translation submitted.
     - name: Create pull request into main
-      uses: thomaseizinger/create-pull-request@1.0.0
+      uses: iloveengineering/create-pull-request@1.0.0
       with:
        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
        head: release/v${{ github.event.inputs.versionName }}
@@ -61,7 +61,7 @@ jobs:
            This PR was created in response workflow running.
            I've updated the version name and code commit: ${{ steps.make-commit.outputs.commit }}.
     - name: Create pull request to develop
-      uses: thomaseizinger/create-pull-request@1.0.0
+      uses: iloveengineering/create-pull-request@1.0.0
       with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           head: release/v${{ github.event.inputs.versionName }}
