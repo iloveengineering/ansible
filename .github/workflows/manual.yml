@@ -1,36 +1,89 @@
-name: Release
-
+name: Cut Release
 on:
-  push:
-    # Sequence of patterns matched against refs/tags
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+' # Push events to any matching semantic tag. For example, 1.10.1 or 2.0.0.
-        # For more details, see https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#filter-pattern-cheat-sheet
-        # and https://docs.npmjs.com/about-semantic-versioning
-
+  workflow_dispatch:
+    inputs:
+      release-type:
+        description: Release type (major/minor/patch)
+        required: true
 jobs:
-  release:
+  cut-release:
+    name: Create release branch and PRs into develop/main
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Exit if release type argument is invalid
+        run: exit 1
+        if: ${{ github.event.inputs.release-type != 'major' && github.event.inputs.release-type != 'minor' && github.event.inputs.release-type != 'patch' }}
+
+      - name: Checkout develop for ${{ github.event.inputs.release-type }} release
         uses: actions/checkout@v2
+        if: ${{ github.event.inputs.release-type == 'major' || github.event.inputs.release-type == 'minor' }}
         with:
-          fetch-depth: 0
-      - name: Build changelog
-        id: build_changelog
-        uses: mikepenz/release-changelog-builder-action@main
+          ref: develop
+
+      - name: Checkout main for ${{ github.event.inputs.release-type }} release
+        uses: actions/checkout@v2
+        if: ${{ github.event.inputs.release-type == 'patch' }}
         with:
-          configuration: 'release-changelog-builder-config.json'
+          ref: main
+
+      - name: Create release branch and generate PR body
+        id: create-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+          RELEASE_TYPE: ${{ github.event.inputs.release-type }}
+        run: |
+          current_version=$(jq -r .version package.json)
+
+          npm version $RELEASE_TYPE --git-tag-version false
+          new_version=$(jq -r .version package.json)
+          git reset --hard
+
+          branch_name="release/${new_version}"
+
+          echo "Current version is $current_version"
+          echo "New version is $new_version"
+          echo "New branch name is $branch_name"
+
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+          git checkout -b "$branch_name"
+
+          npm version $RELEASE_TYPE --git-tag-version false
+
+          git commit -a -m "Bump version to ${new_version}"
+          git push --set-upstream origin "$branch_name"
+
+          # Use --depth to get commits to add to rev-list
+          git fetch origin main --depth 100
+          git fetch origin develop --depth 100
+
+          main_pr_body=$(git rev-list --oneline $branch_name ^origin/main)
+          develop_pr_body=$(git rev-list --oneline $branch_name ^origin/develop)
+
+          echo 'main_pr_body<<END_OF_OUTPUT' >> $GITHUB_ENV
+          echo "$main_pr_body" >> $GITHUB_ENV
+          echo 'END_OF_OUTPUT' >> $GITHUB_ENV
+
+          echo 'develop_pr_body<<END_OF_OUTPUT' >> $GITHUB_ENV
+          echo "$develop_pr_body" >> $GITHUB_ENV
+          echo 'END_OF_OUTPUT' >> $GITHUB_ENV
+
+          echo "::set-output name=branch_name::$branch_name"
+
+      - name: Create pull request into develop
+        uses: repo-sync/pull-request@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: ${{steps.build_changelog.outputs.changelog}}
-          draft: false
-          prerelease: false
+          source_branch: ${{ steps.create-release.outputs.branch_name }}
+          destination_branch: "develop"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_title: ${{ steps.create-release.outputs.branch_name }}
+          pr_body: ${{ env.develop_pr_body }}
+
+      - name: Create pull request into main
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: ${{ steps.create-release.outputs.branch_name }}
+          destination_branch: "main"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_title: ${{ steps.create-release.outputs.branch_name }}
+          pr_body: ${{ env.main_pr_body }}
