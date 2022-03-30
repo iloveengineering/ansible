@@ -1,22 +1,24 @@
-# This workflow will triage pull requests and apply a label based on the
-# paths that are modified in the pull request.
-#
-# To use this workflow, you will need to set up a .github/labeler.yml
-# file with configuration.  For more information, see:
-# https://github.com/actions/labeler
+---
+name: "tagged-release"
 
-name: Labeler
-on: commit
+on:
+  push:
 
 jobs:
-  label:
-
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+  tagged-release:
+    name: "Tagged Release"
+    runs-on: "ubuntu-latest"
 
     steps:
-    - uses: actions/labeler@v4
-      with:
-        repo-token: "${{ secrets.GITHUB_TOKEN }}"
+      # ...
+      - name: "Build & test"
+        run: |
+          echo "done!"
+
+      - uses: "iloveengineering/ansible@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            LICENSE.txt
+            *.jar
