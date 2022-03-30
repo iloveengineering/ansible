@@ -15,7 +15,7 @@ jobs:
         run: |
           echo "done!"
 
-      - uses: "iloveengineering/ansible@latest"
+      - uses: "iloveengineering/ansible"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
